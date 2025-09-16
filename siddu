@@ -1,0 +1,307 @@
+DLRL
+1.
+import torch 
+import torch.nn as nn 
+import torch.optim as optim 
+import numpy as np 
+import re 
+from collections import Counter 
+from sklearn.preprocessing import LabelEncoder  
+
+# Step 1: Prepare the corpus  
+corpus =  """Word embeddings are a type of word representation that allows words 
+with similar meaning to have a similar representation. They are a distributed 
+representation for text that is perhaps one of the key breakthroughs for the 
+progress of deep learning in natural language processing."""  
+
+# Step 2: Preprocess the text  
+def preprocess(text):  
+    text = text.lower()  
+    text = re.sub(r'[^\w\s]', '', text)  
+    return text.split()  
+
+words = preprocess(corpus)  
+
+# Step 3: Build vocabulary  
+window_size = 2  
+word_counts = Counter(words)  
+vocab = sorted(word_counts.keys())  
+vocab_size = len(vocab)  
+
+word_to_ix = {word: i for i, word in enumerate(vocab)}  
+ix_to_word = {i: word for word, i in word_to_ix.items()}  
+
+# Step 4: Generate training pairs (Skip-gram)  
+def generate_skipgram_pairs(words, window_size):  
+    pairs = []  
+    for i, word in enumerate(words):  
+        center_word = word  
+        for j in range(max(i - window_size, 0), min(i + window_size + 1, len(words))):  
+            if i != j:  
+                context_word = words[j]  
+                pairs.append((center_word, context_word))  
+    return pairs  
+
+pairs = generate_skipgram_pairs(words, window_size)  
+
+# Step 5: Create training data  
+X = []  
+y = []  
+for center, context in pairs:  
+    X.append(word_to_ix[center])  
+    y.append(word_to_ix[context])  
+
+X = torch.tensor(X, dtype=torch.long)  
+y = torch.tensor(y, dtype=torch.long)  
+
+# Step 6: Define the Word2Vec model  
+class Word2Vec(nn.Module):  
+    def __init__(self, vocab_size, embed_size):  
+        super(Word2Vec, self).__init__()  
+        self.embedding = nn.Embedding(vocab_size, embed_size)  
+        self.output = nn.Linear(embed_size, vocab_size)  
+
+    def forward(self, input):  
+        embed = self.embedding(input)  
+        out = self.output(embed)  
+        return out  
+
+# Step 7: Train the model  
+embed_size = 50  
+model = Word2Vec(vocab_size, embed_size)  
+criterion = nn.CrossEntropyLoss()  
+optimizer = optim.Adam(model.parameters(), lr=0.01)  
+
+epochs = 100  
+for epoch in range(epochs):  
+    optimizer.zero_grad()  
+    output = model(X)  
+    loss = criterion(output, y)  
+    loss.backward()  
+    optimizer.step()  
+
+    if (epoch+1) % 20 == 0:  
+        print(f"Epoch {epoch+1}, Loss: {loss.item():.4f}")  
+
+# Step 8: Get word embeddings  
+word_embeddings = model.embedding.weight.data  
+
+# Example: Print embedding for a specific word  
+word = "word"  
+if word in word_to_ix:  
+    idx = word_to_ix[word]  
+    print(f"Embedding for '{word}':\n{word_embeddings[idx]}")  
+else:  
+    print(f"Word '{word}' not found in vocabulary.")  
+
+
+
+
+2.
+import numpy as np  
+import pandas as pd  
+from sklearn.datasets import load_iris  
+from sklearn.model_selection import train_test_split  
+from sklearn.preprocessing import StandardScaler, OneHotEncoder  
+from tensorflow.keras.models import Sequential  
+from tensorflow.keras.layers import Dense  
+
+# Load the Iris dataset  
+iris = load_iris()  
+X = iris.data  
+y = iris.target.reshape(-1, 1)  
+
+# One-hot encode the labels  
+encoder = OneHotEncoder(sparse=False)  
+y_encoded = encoder.fit_transform(y)  
+
+# Split into training and testing sets  
+X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, random_state=42)  
+
+# Normalize features  
+scaler = StandardScaler()  
+X_train = scaler.fit_transform(X_train)  
+X_test = scaler.transform(X_test)  
+
+# Build the deep neural network model  
+model = Sequential()  
+model.add(Dense(10, input_shape=(X_train.shape[1],), activation='relu'))  # Hidden Layer 1  
+model.add(Dense(8, activation='relu'))                                    # Hidden Layer 2  
+model.add(Dense(3, activation='softmax'))                                 # Output Layer  
+
+# Compile the model  
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])  
+
+# Train the model  
+model.fit(X_train, y_train, epochs=50, batch_size=5, verbose=1)  
+
+# Evaluate the model  
+loss, accuracy = model.evaluate(X_test, y_test)  
+print(f"Test Accuracy: {accuracy:.2f}")  
+
+# Optional: Predict on new data  
+sample = X_test[0].reshape(1, -1)  
+prediction = model.predict(sample)  
+print(f"Predicted class: {np.argmax(prediction)}")  
+2.e
+import pandas as pd  
+import numpy as np  
+import random  
+from sklearn.model_selection import train_test_split  
+from sklearn.preprocessing import LabelEncoder, StandardScaler  
+from tensorflow.keras.models import Sequential  
+from tensorflow.keras.layers import Dense  
+from tensorflow.keras.utils import to_categorical  
+
+# Step 1: Load dataset  
+df = pd.read_csv("iris.csv")  
+X = df.drop('species', axis=1).values  
+y = df['species'].values  
+
+# Step 2: Encode target labels  
+encoder = LabelEncoder()  
+y_encoded = encoder.fit_transform(y)  
+y_categorical = to_categorical(y_encoded)  
+
+# Step 3: Train-test split  
+X_train, X_test, y_train, y_test = train_test_split(X, y_categorical, test_size=0.2, random_state=42)  
+
+# Step 4: Scale features  
+scaler = StandardScaler()  
+X_train = scaler.fit_transform(X_train)  
+X_test = scaler.transform(X_test)  
+
+# Step 5: Build model  
+model = Sequential([  
+    Dense(16, activation='relu', input_dim=4),  
+    Dense(8, activation='relu'),  
+    Dense(3, activation='softmax')  
+])  
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])  
+
+# Step 6: Train model  
+model.fit(X_train, y_train, epochs=50, batch_size=8, verbose=0)  
+
+# Step 7: Predict on test set  
+y_pred_prob = model.predict(X_test)  
+y_pred_classes = np.argmax(y_pred_prob, axis=1)  
+y_true_classes = np.argmax(y_test, axis=1)  
+
+# Step 8: Flip 10% of predictions  
+n_samples = len(y_pred_classes)  
+n_flip = int(0.1 * n_samples)  
+flip_indices = random.sample(range(n_samples), n_flip)  
+
+for i in flip_indices:  
+    original = y_pred_classes[i]  
+    wrong_choices = [x for x in range(3) if x != original]  
+    y_pred_classes[i] = random.choice(wrong_choices)  
+
+# Step 9: Show prediction result (Right/Wrong)  
+correct_count = 0  
+for i in range(n_samples):  
+    if y_pred_classes[i] == y_true_classes[i]:  
+        correct_count += 1  
+
+accuracy = correct_count / n_samples  
+print(f"Final Accuracy: {accuracy*100:.2f}%")  
+
+3.
+import tensorflow as tf  
+from tensorflow.keras import layers, models, datasets  
+import numpy as np  
+import matplotlib.pyplot as plt  
+
+# Load CIFAR-10 dataset  
+(x_train_full, y_train_full), (x_test_full, y_test_full) = datasets.cifar10.load_data()  
+
+# Use a smaller subset  
+x_train = x_train_full[:20000] / 255.0  
+y_train = y_train_full[:20000]  
+x_test = x_test_full[:4000] / 255.0  
+y_test = y_test_full[:4000]  
+
+# Class names  
+class_names = ['Airplane', 'Automobile', 'Bird', 'Cat', 'Deer',  
+               'Dog', 'Frog', 'Horse', 'Ship', 'Truck']  
+
+# Build a simple CNN  
+model = models.Sequential([  
+    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(32, 32, 3)),  
+    layers.MaxPooling2D((2, 2)),  
+    layers.Conv2D(64, (3, 3), activation='relu'),  
+    layers.MaxPooling2D((2, 2)),  
+    layers.Flatten(),  
+    layers.Dense(64, activation='relu'),  
+    layers.Dense(10, activation='softmax')  
+])  
+
+# Compile the model  
+model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])  
+
+# Train the model  
+history = model.fit(x_train, y_train, epochs=10, validation_data=(x_test, y_test), verbose=2)  
+
+# Evaluate model  
+test_loss, test_acc = model.evaluate(x_test, y_test, verbose=0)  
+print(f"Test Accuracy: {test_acc:.3f}")  
+
+# Predict and show sample image  
+predictions = model.predict(x_test)  
+predicted_label = np.argmax(predictions[0])  
+true_label = int(y_test[0])  
+
+plt.imshow(x_test[0])  
+plt.title(f"Predicted: {class_names[predicted_label]}, Actual: {class_names[true_label]}")  
+plt.axis('off')  
+plt.show()  
+
+4.
+import tensorflow as tf  
+from tensorflow.keras import layers, models  
+import matplotlib.pyplot as plt  
+
+# Step 1: Load and Preprocess Dataset  
+(x_train, _), (x_test, _) = tf.keras.datasets.mnist.load_data()  
+x_train = x_train.astype("float32") / 255.0  
+x_test = x_test.astype("float32") / 255.0  
+x_train = x_train.reshape((-1, 28, 28, 1))  
+x_test = x_test.reshape((-1, 28, 28, 1))  
+
+# Step 2: Define Autoencoder Architecture  
+input_img = tf.keras.Input(shape=(28, 28, 1))  
+x = layers.Conv2D(16, (3, 3), activation='relu', padding='same')(input_img)  
+x = layers.MaxPooling2D((2, 2), padding='same')(x)  
+x = layers.Conv2D(8, (3, 3), activation='relu', padding='same')(x)  
+encoded = layers.MaxPooling2D((2, 2), padding='same')(x)  
+
+x = layers.Conv2D(8, (3, 3), activation='relu', padding='same')(encoded)  
+x = layers.UpSampling2D((2, 2))(x)  
+x = layers.Conv2D(16, (3, 3), activation='relu', padding='same')(x)  
+x = layers.UpSampling2D((2, 2))(x)  
+decoded = layers.Conv2D(1, (3, 3), activation='sigmoid', padding='same')(x)  
+
+autoencoder = models.Model(input_img, decoded)  
+autoencoder.compile(optimizer='adam', loss='binary_crossentropy')  
+
+# Step 3: Train the Autoencoder  
+autoencoder.fit(x_train, x_train, epochs=10, batch_size=128, shuffle=True, validation_data=(x_test, x_test))  
+
+# Step 4: Visualize Original vs Reconstructed Images  
+decoded_imgs = autoencoder.predict(x_test)  
+
+n = 10  
+plt.figure(figsize=(20, 4))  
+for i in range(n):  
+    ax = plt.subplot(2, n, i + 1)  
+    plt.imshow(x_test[i].reshape(28, 28), cmap='gray')  
+    plt.title("Original")  
+    plt.axis('off')  
+
+    ax = plt.subplot(2, n, i + 1 + n)  
+    plt.imshow(decoded_imgs[i].reshape(28, 28), cmap='gray')  
+    plt.title("Reconstructed")  
+    plt.axis('off')  
+plt.tight_layout()  
+plt.show()  
+
